@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import slugify from 'slugify';
 
 const postSchema = new mongoose.Schema({
   title: {
@@ -7,6 +8,10 @@ const postSchema = new mongoose.Schema({
     minlength: 6,
     maxlength: 255,
     trim: true,
+  },
+  slug: {
+    type: String,
+    unique: true,
   },
   description: {
     type: String,
@@ -47,6 +52,14 @@ const postSchema = new mongoose.Schema({
   }],
 }, {
   timestamps: true,
+});
+
+// Generate slug before saving
+postSchema.pre('save', function(next) {
+  if (this.isModified('title')) {
+    this.slug = slugify(this.title, { lower: true, strict: true });
+  }
+  next();
 });
 
 const Post = mongoose.model('Post', postSchema);
