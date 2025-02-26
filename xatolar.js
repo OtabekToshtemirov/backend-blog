@@ -55,7 +55,6 @@ app.post("/auth/login", async (req, res) => {
 
     res.status(200).json({ ...userData, token });
   } catch (error) {
-    console.log(error);
     res.status(500).json({
       message: "Kirishda xatolik yuz berdi",
     });
@@ -96,7 +95,6 @@ app.post("/auth/register", registerValidation, async (req, res) => {
 
     res.status(200).json({ ...userData, token });
   } catch (err) {
-    console.log(err);
     res.status(500).json({
       message: "Ro'yxatdan o'tishda xatolik yuz berdi",
     });

@@ -35,7 +35,6 @@ export const register = async (req, res) => {
 
         res.status(200).json({ ...userData, token });
     } catch (err) {
-        console.log(err);
         res.status(500).json({
             message: "Login yoki parol noto'g'ri",
         });
@@ -61,7 +60,6 @@ export const login = async (req, res) => {
 
         res.status(200).json({ ...userData, token });
     } catch (error) {
-        console.log(error);
         res.status(500).json({
             message: "Login yoki parol noto'g'ri",
         });
@@ -82,7 +80,6 @@ export const getMe =  async (req, res ) =>{
 
 
     } catch (e) {
-        console.log(e)
         res.status(500).json({message:"Avtorizatsiya tugallanmadi"})
     }
 }

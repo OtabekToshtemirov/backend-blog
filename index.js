@@ -11,12 +11,16 @@ import { updatePost, createPost, deletePost, getPosts, getPost, getLastTags, lik
 import { checkAuth, handleValidationErrors } from "./utils/index.js";
 import { getAllComments, getComments, addComment } from "./controllers/CommentController.js";
 
-// Foydalanuvchi nomi va parolingizni kiriting
 const username = encodeURIComponent(process.env.MONGODB_USERNAME);
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
 
 // MongoDB ulanish stringi localhost 
-const mongoDB = `mongodb://localhost:27017/blog`;
+const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
+// mongodb+srv://shoraqorgon:<db_password>@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog
+
+console.log(mongoDB);
+
+const PORT = process.env.PORT;
 
 mongoose
   .connect(mongoDB)
@@ -106,7 +110,7 @@ app.get("/posts/:slug/comments", getComments);
 app.post("/posts/:slug/comments", checkAuth, commentValidation, handleValidationErrors, addComment);
 app.get("/comments", getAllComments);
 
-app.listen(5555, (err) => {
+app.listen(PORT, (err) => {
   if (err) {
     console.log("Serverda xato:", err);
   } else {
