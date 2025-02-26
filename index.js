@@ -14,9 +14,7 @@ import { getAllComments, getComments, addComment } from "./controllers/CommentCo
 const username = encodeURIComponent(process.env.MONGODB_USERNAME);
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
 
-// MongoDB ulanish stringi localhost 
 const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
-// mongodb+srv://shoraqorgon:<db_password>@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog
 
 console.log(mongoDB);
 
