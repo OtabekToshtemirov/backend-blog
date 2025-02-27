@@ -16,8 +16,6 @@ const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
 
 const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
 
-console.log(mongoDB);
-
 const PORT = process.env.PORT;
 
 mongoose
