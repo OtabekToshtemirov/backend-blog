@@ -9,7 +9,7 @@ const handleError = (res, err, message) => {
 const formatImages = (photos) => {
   if (!photos || !Array.isArray(photos)) return [];
   return photos.map(photo => 
-    photo.startsWith('/uploads/') ? photo : `/uploads/${photo}`
+    photo.startsWith('/images/') ? photo : `/images/${photo}`
   );
 };
 

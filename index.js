@@ -10,12 +10,12 @@ import { register, login, getMe } from "./controllers/UserController.js";
 import { updatePost, createPost, deletePost, getPosts, getPost, getLastTags, likePost, getPostsByTag } from "./controllers/PostController.js";
 import { checkAuth, handleValidationErrors } from "./utils/index.js";
 import { getAllComments, getComments, addComment } from "./controllers/CommentController.js";
+import Image from './models/Image.js';
 
 const username = encodeURIComponent(process.env.MONGODB_USERNAME);
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
 
 const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
-
 const PORT = process.env.PORT;
 
 mongoose
@@ -51,7 +51,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({ 
-  storage,
+  storage: multer.memoryStorage(), // diskStorage o'rniga memoryStorage ishlatiladi
   fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
@@ -68,9 +68,9 @@ app.get("/", (req, res) => {
   res.send("Server ishlamoqda");
 });
 
-// Upload route with better error handling
+// Yangilangan upload endpointi
 app.post("/upload", checkAuth, (req, res) => {
-  upload.single("image")(req, res, (err) => {
+  upload.single("image")(req, res, async (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ message: "Fayl hajmi 5MB dan oshmasligi kerak!" });
@@ -82,10 +82,37 @@ app.post("/upload", checkAuth, (req, res) => {
       return res.status(400).json({ message: "Fayl yuklanmadi" });
     }
 
-    res.json({
-      url: `/uploads/${req.file.filename}`,
-    });
+    try {
+      const image = new Image({
+        filename: req.file.originalname,
+        data: req.file.buffer,
+        contentType: req.file.mimetype
+      });
+
+      await image.save();
+
+      res.json({
+        url: `/images/${image._id}`,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Rasm saqlashda xatolik yuz berdi" });
+    }
   });
+});
+
+// Yangi endpoint rasmlarni olish uchun
+app.get("/images/:id", async (req, res) => {
+  try {
+    const image = await Image.findById(req.params.id);
+    if (!image) {
+      return res.status(404).json({ message: "Rasm topilmadi" });
+    }
+
+    res.set('Content-Type', image.contentType);
+    res.send(image.data);
+  } catch (error) {
+    res.status(500).json({ message: "Rasmni yuklashda xatolik yuz berdi" });
+  }
 });
 
 // User routes
