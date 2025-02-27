@@ -59,7 +59,9 @@ const upload = multer({
 });
 
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: 'https://frontend-blog-umber.vercel.app'
+}));
 app.use("/uploads", express.static("uploads"));
 
 app.get("/", (req, res) => {
