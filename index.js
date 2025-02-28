@@ -63,7 +63,7 @@ const upload = multer({
 
 app.use(express.json());
 app.use(cors({
-  origin: 'https://frontend-blog-umber.vercel.app'
+  origin: ['https://frontend-blog-umber.vercel.app', 'https://otablog.uz']
 }));
 app.use("/uploads", express.static("uploads"));
 
