@@ -11,11 +11,14 @@ import { updatePost, createPost, deletePost, getPosts, getPost, getLastTags, lik
 import { checkAuth, handleValidationErrors } from "./utils/index.js";
 import { getAllComments, getComments, addComment } from "./controllers/CommentController.js";
 import Image from './models/Image.js';
+import sharp from 'sharp';
 
 const username = encodeURIComponent(process.env.MONGODB_USERNAME);
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
 
+
 const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
+// const mongoDB = `mongodb://localhost:27017/blog`;
 const PORT = process.env.PORT;
 
 mongoose
@@ -83,18 +86,30 @@ app.post("/upload", checkAuth, (req, res) => {
     }
 
     try {
+      // Convert image to WebP format using sharp
+      const webpBuffer = await sharp(req.file.buffer)
+        .webp({ quality: 80 }) // Adjust quality as needed (0-100)
+        .toBuffer();
+      
+      // Create filename with .webp extension
+      const originalFilename = req.file.originalname.split('.')[0];
+      const newFilename = `${originalFilename}-${Date.now()}.webp`;
+
+      // Save WebP image to MongoDB
       const image = new Image({
-        filename: req.file.originalname,
-        data: req.file.buffer,
-        contentType: req.file.mimetype
+        filename: newFilename,
+        data: webpBuffer,
+        contentType: 'image/webp' // Always webp now
       });
 
       await image.save();
 
       res.json({
         url: `/images/${image._id}`,
+        format: 'webp'
       });
     } catch (error) {
+      console.error("Rasmni WebP formatiga o'tkazishda xatolik:", error);
       res.status(500).json({ message: "Rasm saqlashda xatolik yuz berdi" });
     }
   });
