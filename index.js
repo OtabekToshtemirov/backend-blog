@@ -7,9 +7,9 @@ import dotenv from "dotenv";
 dotenv.config();
 import { registerValidation, loginValidation, createPostValidation, commentValidation } from "./validation.js";
 import { register, login, getMe } from "./controllers/UserController.js";
-import { updatePost, createPost, deletePost, getPosts, getPost, getLastTags, likePost, getPostsByTag } from "./controllers/PostController.js";
+import { updatePost, createPost, deletePost, getPosts, getPost, getLastTags, likePost, getPostsByTag, getLatestPosts, getMostViewedPosts } from "./controllers/PostController.js";
 import { checkAuth, handleValidationErrors } from "./utils/index.js";
-import { getAllComments, getComments, addComment } from "./controllers/CommentController.js";
+import { getAllComments, getComments, addComment, editComment, deleteComment } from "./controllers/CommentController.js";
 import Image from './models/Image.js';
 import sharp from 'sharp';
 
@@ -60,18 +60,18 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024 // 5MB limit
   }
 });
-// {
-//   origin: [
-//     'https://frontend-blog-umber.vercel.app',
-//     'https://otablog.uz',
-//     'https://www.otablog.uz'
-//   ],
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-//   allowedHeaders: ['Content-Type', 'Authorization'],
-//   credentials: true
-// }
+
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://frontend-blog-umber.vercel.app',
+    'https://otablog.uz',
+    'https://www.otablog.uz'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 app.use("/uploads", express.static("uploads"));
 
 app.get("/", (req, res) => {
@@ -145,6 +145,8 @@ app.get("/auth/me", checkAuth, getMe);
 // Post routes
 app.get("/tags", getLastTags);
 app.get("/posts", getPosts);
+app.get("/posts/latest", getLatestPosts); // New endpoint for latest posts
+app.get("/posts/popular", getMostViewedPosts); // New endpoint for most viewed posts
 app.get("/posts/tag/:tag", getPostsByTag);  // Add this before the :slug route
 app.get("/posts/:slug", getPost);
 app.post("/posts", checkAuth, createPostValidation, handleValidationErrors, createPost);
@@ -156,6 +158,8 @@ app.post("/posts/:slug/like", checkAuth, likePost);
 app.get("/posts/:slug/comments", getComments);
 app.post("/posts/:slug/comments", checkAuth, commentValidation, handleValidationErrors, addComment);
 app.get("/comments", getAllComments);
+app.patch("/comments/:commentId", checkAuth, commentValidation, handleValidationErrors, editComment); // Edit a comment
+app.delete("/comments/:commentId", checkAuth, deleteComment); // Delete a comment
 
 app.listen(PORT, (err) => {
   if (err) {

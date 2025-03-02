@@ -135,7 +135,7 @@ export const updatePost = async (req, res) => {
 
     const doc = await Post.findOneAndUpdate(
       { slug: req.params.slug },
-      {
+      { 
         title: req.body.title,
         description: req.body.description,
         photo: formatImages(req.body.photo),
@@ -201,6 +201,48 @@ export const getPostsByTag = async (req, res) => {
 
     if (!posts || posts.length === 0) {
       return res.status(404).json({ message: "Bu tegdagi postlar topilmadi..." });
+    }
+
+    const transformedPosts = posts.map(transformPost);
+    res.status(200).json(transformedPosts);
+  } catch (err) {
+    handleError(res, err, "Xatolik yuz berdi...");
+  }
+};
+
+export const getLatestPosts = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5; // Default to 5 posts if not specified
+    const posts = await Post.find()
+      .populate("author")
+      .populate('comments')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
+
+    if (!posts || posts.length === 0) {
+      return res.status(404).json({ message: "Postlar topilmadi..." });
+    }
+
+    const transformedPosts = posts.map(transformPost);
+    res.status(200).json(transformedPosts);
+  } catch (err) {
+    handleError(res, err, "Xatolik yuz berdi...");
+  }
+};
+
+export const getMostViewedPosts = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5; // Default to 5 posts if not specified
+    const posts = await Post.find()
+      .populate("author")
+      .populate('comments')
+      .sort({ views: -1 }) // Sort by views in descending order
+      .limit(limit)
+      .exec();
+
+    if (!posts || posts.length === 0) {
+      return res.status(404).json({ message: "Postlar topilmadi..." });
     }
 
     const transformedPosts = posts.map(transformPost);

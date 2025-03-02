@@ -57,6 +57,53 @@ export const getComments = async (req, res) => {
   }
 };
 
+export const editComment = async (req, res) => {
+  try {
+    const { text } = req.body;
+    const { commentId } = req.params;
+    const userId = req.userId;
+
+    const comment = await Comment 
+      .findOne({ _id: commentId, author: userId })
+      .exec();
+
+    if (!comment) {
+      return res.status(404).json({ message: "Izoh topilmadi yoki sizga ruxsat berilmagan" });
+    }
+
+    comment.text = text;
+    await comment.save();
+
+    res.json(comment);
+  }
+  catch (err) {
+    handleError(res, err, "Izohni tahrirlashda xatolik yuz berdi");
+  }
+
+};
+
+export const deleteComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.userId;
+
+    const comment = await Comment 
+      .findOne({ _id: commentId, author: userId })
+      .exec();
+
+    if (!comment) {
+      return res.status(404).json({ message: "Izoh topilmadi yoki sizga ruxsat berilmagan" });
+    }
+
+    await Comment.deleteOne({ _id: commentId }).exec();
+
+    res.json({ message: "Izoh o'chirildi" });
+  }
+  catch (err) {
+    handleError(res, err, "Izohni o'chirishda xatolik yuz berdi");
+  }
+};
+
 // Function to get all comments
 export const getAllComments = async (req, res) => {
   try {
