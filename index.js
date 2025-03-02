@@ -60,18 +60,18 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024 // 5MB limit
   }
 });
-
+// {
+//   origin: [
+//     'https://frontend-blog-umber.vercel.app',
+//     'https://otablog.uz',
+//     'https://www.otablog.uz'
+//   ],
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization'],
+//   credentials: true
+// }
 app.use(express.json());
-app.use(cors({
-  origin: [
-    'https://frontend-blog-umber.vercel.app',
-    'https://otablog.uz',
-    'https://www.otablog.uz'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+app.use(cors());
 app.use("/uploads", express.static("uploads"));
 
 app.get("/", (req, res) => {
