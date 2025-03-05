@@ -23,6 +23,20 @@ const transformPost = (post) => {
   };
 };
 
+const validateAndCleanTags = (tags) => {
+  if (typeof tags === 'string') {
+    return tags
+      .split(',')
+      .map(tag => tag.trim().replace(/^#/, ''))
+      .filter(tag => tag.length > 0);
+  } else if (Array.isArray(tags)) {
+    return tags
+      .map(tag => tag.toString().trim().replace(/^#/, ''))
+      .filter(tag => tag.length > 0);
+  }
+  return [];
+};
+
 export const getPosts = async (req, res) => {
   try {
     const sortBy = req.query.sortBy === 'views' ? { views: -1 } : { createdAt: -1 };
@@ -97,56 +111,76 @@ export const getPost = async (req, res) => {
 
 export const createPost = async (req, res) => {
   try {
-    let tagsArray;
-    if (typeof req.body.tags === 'string') {
-      tagsArray = req.body.tags.split(",").map(tag => tag.trim());
-    } else {
-      tagsArray = [];
-    }
+    const cleanedTags = validateAndCleanTags(req.body.tags);
 
-    const post = new Post({
+    const doc = new Post({
       title: req.body.title,
       description: req.body.description,
-      photo: formatImages(req.body.photo),
-      tags: tagsArray,
+      tags: cleanedTags,
+      photo: req.body.photo,
       author: req.userId,
+      isPublished: req.body.isPublished ?? true,
+      anonymous: req.body.anonymous ?? false,
+      anonymousAuthor: req.body.anonymous ? "Anonim foydalanuvchi" : null,
     });
 
-    const doc = await post.save();
-    const populatedDoc = await Post.findById(doc._id)
-      .populate("author")
-      .exec();
-    res.status(201).json(transformPost(populatedDoc));
+    const post = await doc.save();
+    res.json(post);
   } catch (err) {
-    handleError(res, err, "Xatolik yuz berdi...");
+    console.error("Post yaratishda xatolik:", err);
+    res.status(500).json({
+      message: "Post yaratib bo'lmadi",
+    });
   }
 };
 
 export const updatePost = async (req, res) => {
   try {
     const post = await Post.findOne({ slug: req.params.slug });
+
     if (!post) {
-      return res.status(404).json({ message: "Post topilmadi..." });
-    }
-    
-    if (post.author.toString() !== req.userId) {
-      return res.status(403).json({ message: "Faqat post egasi tahrirlashi mumkin" });
+      return res.status(404).json({ message: "Post topilmadi" });
     }
 
-    const doc = await Post.findOneAndUpdate(
+    if (post.author.toString() !== req.userId) {
+      return res.status(403).json({ message: "Postni o'zgartirish huquqi yo'q" });
+    }
+
+    const cleanedTags = validateAndCleanTags(req.body.tags);
+    if (cleanedTags.length === 0 && req.body.tags) {
+      return res.status(400).json({ 
+        success: false,
+        errors: [
+          { field: 'tags', message: "Invalid value" },
+          { field: 'tags', message: "Tags must be comma-separated strings" }
+        ]
+      });
+    }
+
+    const updatedData = {
+      title: req.body.title,
+      description: req.body.description,
+      tags: cleanedTags,
+      photo: req.body.photo,
+      isPublished: req.body.isPublished ?? post.isPublished,
+      anonymous: req.body.anonymous ?? post.anonymous,
+      anonymousAuthor: req.body.anonymous ? "Anonim foydalanuvchi" : null,
+    };
+
+    const updatedPost = await Post.findOneAndUpdate(
       { slug: req.params.slug },
-      { 
-        title: req.body.title,
-        description: req.body.description,
-        photo: formatImages(req.body.photo),
-        tags: req.body.tags.split(","),
-      },
+      updatedData,
       { new: true }
     ).populate("author");
-    
-    res.status(200).json(transformPost(doc));
+
+    res.json(updatedPost);
   } catch (err) {
-    handleError(res, err, "Xatolik yuz berdi...");
+    console.error("Postni yangilashda xatolik:", err);
+    res.status(500).json({
+      success: false,
+      message: "Postni yangilab bo'lmadi",
+      error: err.message
+    });
   }
 };
 
@@ -192,21 +226,25 @@ export const likePost = async (req, res) => {
 
 export const getPostsByTag = async (req, res) => {
   try {
-    const tag = req.params.tag;
-    const posts = await Post.find({ tags: tag })
+    const tag = req.params.tag.replace(/^#/, ''); // Remove # if it exists
+    const posts = await Post.find({ tags: { $regex: new RegExp('^' + tag + '$', 'i') } })
       .populate("author")
       .populate('comments')
       .sort({ createdAt: -1 })
       .exec();
 
     if (!posts || posts.length === 0) {
-      return res.status(404).json({ message: "Bu tegdagi postlar topilmadi..." });
+      return res.status(404).json({ 
+        success: false,
+        message: "Bu tegdagi postlar topilmadi..." 
+      });
     }
 
     const transformedPosts = posts.map(transformPost);
     res.status(200).json(transformedPosts);
   } catch (err) {
-    handleError(res, err, "Xatolik yuz berdi...");
+    console.error("Tag search error:", err);
+    handleError(res, err, "Teglar bo'yicha qidirishda xatolik yuz berdi...");
   }
 };
 

@@ -6,10 +6,10 @@ import fs from "fs";
 import dotenv from "dotenv";
 dotenv.config();
 import { registerValidation, loginValidation, createPostValidation, commentValidation } from "./validation.js";
-import { register, login, getMe } from "./controllers/UserController.js";
+import { register, login, getMe, updateUser, deleteUser } from "./controllers/UserController.js";
 import { updatePost, createPost, deletePost, getPosts, getPost, getLastTags, likePost, getPostsByTag, getLatestPosts, getMostViewedPosts } from "./controllers/PostController.js";
 import { checkAuth, handleValidationErrors } from "./utils/index.js";
-import { getAllComments, getComments, addComment, editComment, deleteComment } from "./controllers/CommentController.js";
+import { getAllComments, getComments, addComment, editComment, deleteComment, getLatestComments } from "./controllers/CommentController.js";
 import Image from './models/Image.js';
 import sharp from 'sharp';
 
@@ -66,7 +66,8 @@ app.use(cors({
   origin: [
     'https://frontend-blog-umber.vercel.app',
     'https://otablog.uz',
-    'https://www.otablog.uz'
+    'https://www.otablog.uz',
+    'http://localhost:3000'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -141,20 +142,23 @@ app.get("/images/:id", async (req, res) => {
 app.post("/auth/register", registerValidation, handleValidationErrors, register);
 app.post("/auth/login", loginValidation, handleValidationErrors, login);
 app.get("/auth/me", checkAuth, getMe);
+app.patch("/auth/me", checkAuth, updateUser);
+app.delete("/auth/me", checkAuth, deleteUser);
 
-// Post routes
+// Post routes - order is important!
 app.get("/tags", getLastTags);
-app.get("/posts", getPosts);
-app.get("/posts/latest", getLatestPosts); // New endpoint for latest posts
-app.get("/posts/popular", getMostViewedPosts); // New endpoint for most viewed posts
-app.get("/posts/tag/:tag", getPostsByTag);  // Add this before the :slug route
+app.get("/posts/latest", getLatestPosts);
+app.get("/posts/popular", getMostViewedPosts);
+app.get("/posts/tag/:tag", getPostsByTag);  // Make sure this comes before /:slug
 app.get("/posts/:slug", getPost);
+app.get("/posts", getPosts);
 app.post("/posts", checkAuth, createPostValidation, handleValidationErrors, createPost);
 app.patch("/posts/:slug", checkAuth, createPostValidation, handleValidationErrors, updatePost);
 app.delete("/posts/:slug", checkAuth, deletePost);
 app.post("/posts/:slug/like", checkAuth, likePost);
 
 // Comment routes
+app.get("/comments/latest", getLatestComments);
 app.get("/posts/:slug/comments", getComments);
 app.post("/posts/:slug/comments", checkAuth, commentValidation, handleValidationErrors, addComment);
 app.get("/comments", getAllComments);
@@ -165,6 +169,6 @@ app.listen(PORT, (err) => {
   if (err) {
     console.log("Serverda xato:", err);
   } else {
-    console.log("Server 5555 portda ishlamoqda");
+    console.log(`Server ${PORT} portda ishlamoqda`);
   }
 });

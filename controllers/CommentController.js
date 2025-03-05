@@ -11,30 +11,35 @@ const handleError = (res, err, message) => {
 // Function to add a comment to a post
 export const addComment = async (req, res) => {
   try {
-    const { text } = req.body;
-    const { slug } = req.params;
-    const userId = req.userId;
-
-    const post = await Post.findOne({ slug });
+    const postId = req.params.postId;
+    const post = await Post.findById(postId);
+    
     if (!post) {
-      return res.status(404).json({ message: "Post topilmadi..." });
+      return res.status(404).json({ message: "Post topilmadi" });
     }
 
     const newComment = new Comment({
-      text,
-      author: userId,
-      post: post._id,
+      text: req.body.text,
+      post: postId,
+      author: req.userId,
+      anonymous: req.body.anonymous ?? false,
+      anonymousAuthor: req.body.anonymous ? "Anonim foydalanuvchi" : null,
     });
 
-    await newComment.save();
+    const savedComment = await newComment.save();
+    
+    // Add to post's comments array
+    post.comments.push(savedComment._id);
+    await post.save();
 
-    const populatedComment = await Comment.findById(newComment._id)
-      .populate('author')
-      .exec();
+    // Populate author info for response
+    const populatedComment = await Comment.findById(savedComment._id)
+      .populate('author', 'fullname avatar');
 
-    res.json(populatedComment);
-  } catch (err) {
-    handleError(res, err, "Izoh qo'shishda xatolik yuz berdi");
+    res.status(201).json(populatedComment);
+  } catch (error) {
+    console.error("Comment yaratishda xatolik:", error);
+    res.status(500).json({ message: "Izoh qo'shishda xatolik yuz berdi" });
   }
 };
 
@@ -116,5 +121,22 @@ export const getAllComments = async (req, res) => {
     res.json(comments);
   } catch (err) {
     handleError(res, err, "Izohlarni olishda xatolik yuz berdi");
+  }
+};
+
+// Function to get latest comments
+export const getLatestComments = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+    const comments = await Comment.find()
+      .populate('author')
+      .populate('post')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
+
+    res.json(comments);
+  } catch (err) {
+    handleError(res, err, "So'nggi izohlarni olishda xatolik yuz berdi");
   }
 };

@@ -50,6 +50,14 @@ const postSchema = new mongoose.Schema({
     ref: 'Comment',
     default: [],
   }],
+  anonymous: {
+    type: Boolean,
+    default: false,
+  },
+  anonymousAuthor: {
+    type: String,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

@@ -19,6 +19,14 @@ const commentSchema = new mongoose.Schema(
       ref: "Post",
       required: true,
     },
+    anonymous: {
+      type: Boolean,
+      default: false
+    },
+    anonymousAuthor: {
+      type: String,
+      default: null
+    }
   },
   {
     timestamps: true,
