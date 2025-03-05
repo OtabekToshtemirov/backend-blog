@@ -10,7 +10,23 @@ export const register = async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({
-                message: "Login yoki parol noto'g'ri",
+                success: false,
+                errors: errors.array().map(err => ({
+                    field: err.path,
+                    message: err.msg
+                }))
+            });
+        }
+
+        // Check if user already exists with this email
+        const existingUser = await User.findOne({ email: req.body.email });
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                errors: [{ 
+                    field: "email", 
+                    message: "Bu email bilan foydalanuvchi allaqachon mavjud" 
+                }]
             });
         }
 
@@ -37,8 +53,10 @@ export const register = async (req, res) => {
 
         res.status(200).json({ ...userData, token });
     } catch (err) {
+        console.error("Registration error:", err);
         res.status(500).json({
-            message: "Login yoki parol noto'g'ri",
+            success: false,
+            errors: [{ message: "Ro'yxatdan o'tishda xatolik yuz berdi" }]
         });
     }
 }
@@ -48,7 +66,8 @@ export const login = async (req, res) => {
         const user = await User.findOne({ email: req.body.email });
         if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
             return res.status(400).json({
-                message: "Login yoki parol noto'g'ri",
+                success: false,
+                errors: [{ message: "Login yoki parol noto'g'ri" }]
             });
         }
 
@@ -63,7 +82,8 @@ export const login = async (req, res) => {
         res.status(200).json({ ...userData, token });
     } catch (error) {
         res.status(500).json({
-            message: "Login yoki parol noto'g'ri",
+            success: false,
+            errors: [{ message: "Tizimga kirishda xatolik yuz berdi" }]
         });
     }
 }
