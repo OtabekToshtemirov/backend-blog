@@ -31,7 +31,7 @@ export const options = {
 export function setup() {
   const baseUrl = __ENV.API_BASE_URL || 'http://localhost:4444';
   
-  console.log(`Setting up tests with base URL: ${baseUrl}`);
+  
   
   // Register a single test user for all tests
   const email = `testuser-${randomString(8)}@example.com`;
@@ -52,7 +52,7 @@ export function setup() {
     try {
       const responseBody = JSON.parse(registerRes.body);
       token = responseBody.token;
-      console.log('Test user registered successfully with token');
+      
     } catch (e) {
       console.error(`Failed to parse registration response: ${e}`);
     }
@@ -72,7 +72,7 @@ export function setup() {
       try {
         const responseBody = JSON.parse(loginRes.body);
         token = responseBody.token;
-        console.log('Test user logged in successfully with token');
+        
       } catch (e) {
         console.error(`Failed to parse login response: ${e}`);
       }
@@ -115,7 +115,7 @@ export function setup() {
         const postResponse = JSON.parse(createPostRes.body);
         postId = postResponse._id;
         postSlug = postResponse.slug;
-        console.log(`Created test post with ID: ${postId}, slug: ${postSlug} for comment tests`);
+        
       } catch (e) {
         console.error(`Failed to parse create post response: ${e}`);
       }
@@ -144,10 +144,10 @@ export default function(data) {
     return;
   }
   
-  console.log(`Running tests in mode: ${testMode} with baseUrl: ${baseUrl}`);
+  
   
   if (token) {
-    console.log('Tests will run with valid authentication token');
+    
   } else {
     console.warn('No authentication token available, some tests may be skipped');
   }
@@ -155,17 +155,17 @@ export default function(data) {
   // Check which tests to run based on TEST_MODE environment variable
   switch(testMode.toLowerCase()) {
     case 'health':
-      console.log('Running health check tests only');
+      
       healthCheck.default();
       break;
       
     case 'auth':
-      console.log('Running authentication tests only');
+      
       authTests.default();
       break;
       
     case 'posts':
-      console.log('Running post tests only');
+      
       if (token) {
         postTests.default(data);
       } else {
@@ -174,13 +174,13 @@ export default function(data) {
       break;
       
     case 'comments':
-      console.log('Running comment tests only');
+      
       if (token) {
         if (postId) {
-          console.log(`Running comment tests with existing post ID: ${postId}`);
+          
           commentTests.default({...data});
         } else {
-          console.log('No post ID available, comment tests will create their own post');
+          
           commentTests.default({...data});
         }
       } else {
@@ -190,7 +190,7 @@ export default function(data) {
       
     case 'all':
     default:
-      console.log('Running all tests');
+      
       
       // Run tests in sequence with appropriate delays
       group('Health Check Tests', () => {
@@ -222,11 +222,11 @@ export default function(data) {
           };
           
           if (commentTestData.postId) {
-            console.log(`Running comment tests with post ID: ${commentTestData.postId}`);
+            
             const commentResult = commentTests.default(commentTestData);
             if (commentResult && commentResult.commentId) {
               commentTestData.commentId = commentResult.commentId;
-              console.log(`Stored comment ID: ${commentTestData.commentId} for subsequent tests`);
+              
             }
           } else {
             console.warn('No post ID available for comment tests, they may fail');

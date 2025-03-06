@@ -36,7 +36,7 @@ export function setup() {
     try {
       const responseBody = JSON.parse(registerRes.body);
       token = responseBody.token;
-      console.log('Comment tests: User registered successfully with token');
+      
     } catch (e) {
       console.error(`Failed to parse registration response: ${e}`);
     }
@@ -56,7 +56,7 @@ export function setup() {
       try {
         const responseBody = JSON.parse(loginRes.body);
         token = responseBody.token;
-        console.log('Comment tests: User logged in successfully with token');
+        
       } catch (e) {
         console.error(`Failed to parse login response: ${e}`);
       }
@@ -100,7 +100,7 @@ export function setup() {
       const postResponse = JSON.parse(createPostRes.body);
       postId = postResponse._id;
       postSlug = postResponse.slug;
-      console.log(`Comment tests: Created test post with ID: ${postId}, slug: ${postSlug}`);
+      
     } catch (e) {
       console.error(`Failed to parse create post response: ${e}`);
     }
@@ -110,7 +110,7 @@ export function setup() {
   
   // Store the token and post data globally for the test
   if (token && postSlug) {
-    console.log('Comment tests: Setup complete with valid token and post slug');
+    
   }
   
   return {
@@ -130,7 +130,7 @@ export default function (data) {
     return;
   }
   
-  console.log(`Running comment tests with valid token and slug: ${postSlug}`);
+  
   
   const authHeaders = {
     'Authorization': `Bearer ${token}`,
@@ -162,7 +162,7 @@ export default function (data) {
         try {
           const res = JSON.parse(r.body);
           commentId = res._id; // Store the comment ID for later tests
-          console.log(`Created comment with ID: ${commentId}`);
+          
           return res.text === commentText;
         } catch (e) {
           console.error(`Failed to parse comment response: ${e.message}`);

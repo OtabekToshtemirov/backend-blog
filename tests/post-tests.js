@@ -47,7 +47,7 @@ export function setup() {
   }
   
   const token = responseBody.token;
-  console.log('Post tests: User registered successfully with token');
+  
   
   return {
     baseUrl,
@@ -103,7 +103,7 @@ export default function (data) {
           const res = JSON.parse(r.body);
           postSlug = res.slug; // Store the post slug for later tests
           postId = res._id;    // Store the post ID for later tests
-          console.log(`Post tests: Created post with slug: ${postSlug}`);
+          
           return res.title === postTitle && res.description === postDescription;
         } catch (e) {
           console.error(`Failed to parse post response: ${e}`);
@@ -235,7 +235,7 @@ export default function (data) {
           'Post is deleted': (r) => r.status === 404,
         });
       } else {
-        console.log(`Skipping post deletion for slug: ${postSlug} to preserve it for comment tests`);
+        
       }
       
       sleep(1);

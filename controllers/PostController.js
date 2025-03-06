@@ -39,20 +39,20 @@ const validateAndCleanTags = (tags) => {
 
 export const getPosts = async (req, res) => {
   try {
-    console.log('Getting posts with query:', req.query); // Debug log
+     // Debug log
     const sortBy = req.query.sortBy === 'views' ? '-views' : '-createdAt';
     
-    console.log('Fetching posts with sort:', sortBy); // Debug log
+     // Debug log
     const posts = await Post.find()
       .populate("author")
       .populate('comments')
       .sort(sortBy)
       .exec();
 
-    console.log(`Found ${posts.length} posts`); // Debug log
+     // Debug log
 
     if (!posts || posts.length === 0) {
-      console.log('No posts found'); // Debug log
+       // Debug log
       return res.status(404).json({ 
         success: false,
         message: "Postlar topilmadi..." 
@@ -60,7 +60,7 @@ export const getPosts = async (req, res) => {
     }
 
     const transformedPosts = posts.map(transformPost);
-    console.log('Transformed posts:', transformedPosts.length); // Debug log
+     // Debug log
     
     res.status(200).json(transformedPosts);
   } catch (err) {

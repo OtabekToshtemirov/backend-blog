@@ -54,7 +54,7 @@ export const addComment = async (req, res) => {
     try {
       // Save comment
       const savedComment = await newComment.save({ session });
-      console.log('Saved comment:', savedComment);
+      
       
       // Update post's comments array with one query
       await Post.findByIdAndUpdate(
@@ -68,7 +68,7 @@ export const addComment = async (req, res) => {
       
       // Get populated comment
       const populatedComment = await populateComment(savedComment._id);
-      console.log('Populated comment:', populatedComment);
+      
 
       // Return flattened response structure for tests compatibility
       // IMPORTANT: Tests expect _id directly at the root level, not nested under "comment"
