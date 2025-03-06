@@ -39,21 +39,33 @@ const validateAndCleanTags = (tags) => {
 
 export const getPosts = async (req, res) => {
   try {
-    const sortBy = req.query.sortBy === 'views' ? { views: -1 } : { createdAt: -1 };
+    console.log('Getting posts with query:', req.query); // Debug log
+    const sortBy = req.query.sortBy === 'views' ? '-views' : '-createdAt';
+    
+    console.log('Fetching posts with sort:', sortBy); // Debug log
     const posts = await Post.find()
       .populate("author")
       .populate('comments')
       .sort(sortBy)
       .exec();
 
+    console.log(`Found ${posts.length} posts`); // Debug log
+
     if (!posts || posts.length === 0) {
-      return res.status(404).json({ message: "Postlar topilmadi..." });
+      console.log('No posts found'); // Debug log
+      return res.status(404).json({ 
+        success: false,
+        message: "Postlar topilmadi..." 
+      });
     }
 
     const transformedPosts = posts.map(transformPost);
+    console.log('Transformed posts:', transformedPosts.length); // Debug log
+    
     res.status(200).json(transformedPosts);
   } catch (err) {
-    handleError(res, err, "Xatolik yuz berdi...");
+    console.error("Error in getPosts:", err); // Detailed error log
+    handleError(res, err, "Postlarni olishda xatolik yuz berdi");
   }
 };
 
