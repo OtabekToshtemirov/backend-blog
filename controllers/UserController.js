@@ -4,6 +4,10 @@ import User from "../models/User.js";
 import Post from "../models/Post.js";
 import Comment from "../models/Comment.js";
 import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'secretKey123';
 
 export const register = async (req, res) => {
     try {
@@ -18,7 +22,7 @@ export const register = async (req, res) => {
             });
         }
 
-        // Check if user already exists with this email
+        // Email mavjudligini tekshirish
         const existingUser = await User.findOne({ email: req.body.email });
         if (existingUser) {
             return res.status(400).json({
@@ -30,27 +34,27 @@ export const register = async (req, res) => {
             });
         }
 
-        const passwordHash = req.body.password;
+        // Parolni hash qilish
         const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(passwordHash, salt);
+        const hash = await bcrypt.hash(req.body.password, salt);
 
-        const doc = new User({
+        // Yangi foydalanuvchini yaratish
+        const user = await new User({
             fullname: req.body.fullname,
             avatarUrl: req.body.avatarUrl,
             email: req.body.email,
             password: hash,
-        });
+        }).save();
 
-        const user = await doc.save();
-
+        // JWT token yaratish
         const token = jwt.sign(
             { _id: user._id },
-            "secretKey123",
+            JWT_SECRET,
             { expiresIn: "30d" }
         );
 
+        // Parolsiz ma'lumotlarni qaytarish
         const { password, ...userData } = user._doc;
-
         res.status(200).json({ ...userData, token });
     } catch (err) {
         console.error("Registration error:", err);
@@ -63,24 +67,35 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
     try {
-        const user = await User.findOne({ email: req.body.email });
-        if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
+        // Foydalanuvchini topish va parolni tekshirish
+        const user = await User.findOne({ email: req.body.email }).select('+password'); // Password field explicitly selected
+        if (!user) {
             return res.status(400).json({
                 success: false,
                 errors: [{ message: "Login yoki parol noto'g'ri" }]
             });
         }
 
+        const isValidPassword = await bcrypt.compare(req.body.password, user.password);
+        if (!isValidPassword) {
+            return res.status(400).json({
+                success: false,
+                errors: [{ message: "Login yoki parol noto'g'ri" }]
+            });
+        }
+
+        // JWT token yaratish
         const token = jwt.sign(
             { _id: user._id },
-            "secretKey123",
+            JWT_SECRET,
             { expiresIn: "30d" }
         );
 
+        // Parolsiz ma'lumotlarni qaytarish
         const { password, ...userData } = user._doc;
-
         res.status(200).json({ ...userData, token });
     } catch (error) {
+        console.error("Login error:", error);
         res.status(500).json({
             success: false,
             errors: [{ message: "Tizimga kirishda xatolik yuz berdi" }]

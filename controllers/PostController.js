@@ -37,55 +37,81 @@ const validateAndCleanTags = (tags) => {
   return [];
 };
 
+// Optimallashtirilgan funksiyalar - projection va partial population ishlatilgan
 export const getPosts = async (req, res) => {
   try {
-     // Debug log
-    const sortBy = req.query.sortBy === 'views' ? '-views' : '-createdAt';
+    const { sortBy = 'date', page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
     
-     // Debug log
-    const posts = await Post.find()
-      .populate("author")
-      .populate('comments')
-      .sort(sortBy)
+    // Saralash parametrlarini aniqlash
+    const sortOptions = sortBy === 'views' ? { views: -1 } : { createdAt: -1 };
+    
+    // Oldindan hisoblangan count
+    const totalCount = await Post.countDocuments();
+    
+    // Faqat kerakli ma'lumotlarni olish uchun projection
+    const posts = await Post.find({}, {
+      title: 1,
+      slug: 1,
+      description: { $substr: ["$description", 0, 200] },
+      photo: { $slice: ["$photo", 1] }, // Faqat birinchi rasmni olish
+      author: 1,
+      tags: 1,
+      views: 1,
+      createdAt: 1,
+      isPublished: 1,
+      anonymous: 1,
+      anonymousAuthor: 1,
+      comments: { $slice: 0 }, // Comments sonini bilish uchun, lekin kontentni olmaslik
+      likes: { $size: "$likes" } // Likes sonini hisoblash
+    })
+      .populate("author", "fullname avatar") // Faqat kerakli maydonlarni populate qilish
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean() // Mongoose objektlarini oddiy JS objektlariga aylantirish - tezroq
       .exec();
 
-     // Debug log
-
     if (!posts || posts.length === 0) {
-       // Debug log
       return res.status(404).json({ 
         success: false,
         message: "Postlar topilmadi..." 
       });
     }
 
-    const transformedPosts = posts.map(transformPost);
-     // Debug log
+    // Comments sonini asl arraydan hisoblash o'rniga hisoblash
+    const transformedPosts = posts.map(post => ({
+      ...post,
+      photo: formatImages(post.photo),
+      commentsCount: post.comments?.length || 0,
+      likesCount: post.likes || 0
+    }));
     
-    res.status(200).json(transformedPosts);
+    res.status(200).json({
+      posts: transformedPosts,
+      pagination: {
+        total: totalCount,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(totalCount / limit)
+      }
+    });
   } catch (err) {
-    console.error("Error in getPosts:", err); // Detailed error log
+    console.error("Error in getPosts:", err);
     handleError(res, err, "Postlarni olishda xatolik yuz berdi");
   }
 };
 
 export const getLastTags = async (req, res) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 }).exec();
-    
-    // Create a map to count tag occurrences
-    const tagCount = {};
-    posts.forEach(post => {
-      post.tags.forEach(tag => {
-        tagCount[tag] = (tagCount[tag] || 0) + 1;
-      });
-    });
-
-    // Convert to array of objects with name and count
-    const tags = Object.entries(tagCount)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);  // Get top 10 tags
+    // Tezroq tag statistikasi olish uchun aggregate ishlatish
+    const tags = await Post.aggregate([
+      { $unwind: "$tags" },
+      { $group: { _id: "$tags", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+      { $project: { name: "$_id", count: 1, _id: 0 } }
+    ]);
 
     res.status(200).json(tags);
   } catch (err) {
@@ -100,21 +126,30 @@ export const getPost = async (req, res) => {
       { $inc: { views: 1 } },
       { returnDocument: "after" }
     )
-      .populate("author")
+      .populate("author", "fullname avatar") // Faqat kerakli maydonlarni populate qilish
       .populate({
         path: 'comments',
+        options: { sort: { createdAt: -1 }, limit: 10 }, // So'nggi 10 ta kommentlarni olish
         populate: {
           path: 'author',
           select: 'fullname avatar'
         }
       })
+      .lean() // Mongoose objektlarini oddiy JS objektlariga aylantirish
       .exec();
 
     if (!doc) {
       return res.status(404).json({ message: "Maqola topilmadi..." });
     }
 
-    const post = transformPost(doc);
+    // Post ma'lumotlarini formatlash
+    const post = {
+      ...doc,
+      photo: formatImages(doc.photo),
+      commentsCount: doc.comments?.length || 0,
+      likesCount: doc.likes?.length || 0
+    };
+    
     res.status(200).json(post);
   } catch (err) {
     handleError(res, err, "Xatolik yuz berdi...");

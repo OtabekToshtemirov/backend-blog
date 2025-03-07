@@ -15,52 +15,71 @@ import sharp from 'sharp';
 
 const username = encodeURIComponent(process.env.MONGODB_USERNAME);
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
+const JWT_SECRET = process.env.JWT_SECRET || 'secretKey123'; // .env faylida JWT_SECRET o'zgaruvchisini qo'shish kerak
 
+// MongoDB ulanish sozlamalari
+const connectionOptions = {
+  serverSelectionTimeoutMS: 5000, // So'rov vaqti cheklovi
+  socketTimeoutMS: 45000, // Socket timeouts
+  family: 4, // IPv4 orqali ulanish, tezroq ishlashi mumkin
+  maxPoolSize: 10, // Maksimal ulanishlar soni
+  minPoolSize: 2,  // Minimal ulanishlar soni
+};
 
 const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
 // const mongoDB = `mongodb://localhost:27017/blog`;
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 4444; // Default port qo'shildi
 
-mongoose
-  .connect(mongoDB)
-  .then(() => console.log("Ma'lumotlar bazasi ulandi"))
-  .catch((err) => console.log("Ma'lumotlar bazasiga ulanib bo'lmadi", err));
+// Qayta urinishlar bilan MongoDB ga ulanish
+const connectWithRetry = () => {
+  console.log('MongoDB ga ulanish...');
+  mongoose
+    .connect(mongoDB, connectionOptions)
+    .then(() => {
+      console.log("Ma'lumotlar bazasi muvaffaqiyatli ulandi");
+      // Tegishli indekslarni yaratish
+      mongoose.connection.db.command({ ping: 1 })
+        .then(() => console.log("Database ping successful"))
+        .catch(err => console.error("Database ping failed:", err));
+    })
+    .catch(err => {
+      console.log("MongoDB ulanishda xato:", err);
+      console.log("5 soniyadan so'ng qayta urinish...");
+      setTimeout(connectWithRetry, 5000);
+    });
+};
+
+connectWithRetry();
+
+// MongoDB ulanish holatini kuzatish
+mongoose.connection.on('error', err => {
+  console.error('MongoDB xatosi:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB dan uzildi, qayta ulanish...');
+  setTimeout(connectWithRetry, 5000);
+});
 
 const app = express();
 
-// Configure multer for image uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Ensure uploads directory exists
-    if (!fs.existsSync('uploads')) {
-      fs.mkdirSync('uploads');
-    }
-    cb(null, "uploads");
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = file.originalname.split('.').pop().toLowerCase();
-    cb(null, `${uniqueSuffix}.${ext}`);
-  },
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Faqat rasmlar yuklash mumkin! (.jpg, .png, .gif, .webp)'), false);
-  }
-};
-
+// Xotira optimizatsiyasi uchun memoryStorage ishlatilmoqda
 const upload = multer({ 
-  storage: multer.memoryStorage(), // diskStorage o'rniga memoryStorage ishlatiladi
-  fileFilter,
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Faqat rasmlar yuklash mumkin! (.jpg, .png, .gif, .webp)'), false);
+    }
+  },
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit
   }
 });
 
+// REST API middleware
 app.use(express.json());
 app.use(cors({
   origin: [
@@ -73,9 +92,20 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
   exposedHeaders: ['Authorization'],
   credentials: true,
-  optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
+  optionsSuccessStatus: 200
 }));
+
 app.use("/uploads", express.static("uploads"));
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+  res.status(200).json({ 
+    status: "ok", 
+    dbConnection: dbStatus,
+    serverTime: new Date().toISOString()
+  });
+});
 
 app.get("/", (req, res) => {
   res.send("Server ishlamoqda");
@@ -96,20 +126,33 @@ app.post("/upload", checkAuth, (req, res) => {
     }
 
     try {
-      // Convert image to WebP format using sharp
-      const webpBuffer = await sharp(req.file.buffer)
-        .webp({ quality: 80 }) // Adjust quality as needed (0-100)
+      // Rasm o'lchamlarini optimallashtirish
+      const imgBuffer = req.file.buffer;
+      const imgSize = imgBuffer.length;
+      let quality = 80; // Default sifat
+      
+      // Katta rasmlar uchun sifatni kamaytirish
+      if (imgSize > 3 * 1024 * 1024) {
+        quality = 60;
+      } else if (imgSize > 1 * 1024 * 1024) {
+        quality = 70;
+      }
+
+      // Rasm o'lchamlarini maksimal 1200px gacha cheklash
+      const webpBuffer = await sharp(imgBuffer)
+        .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality }) 
         .toBuffer();
       
-      // Create filename with .webp extension
+      // Filename yaratish
       const originalFilename = req.file.originalname.split('.')[0];
       const newFilename = `${originalFilename}-${Date.now()}.webp`;
 
-      // Save WebP image to MongoDB
+      // MongoDB ga saqlash
       const image = new Image({
         filename: newFilename,
         data: webpBuffer,
-        contentType: 'image/webp' // Always webp now
+        contentType: 'image/webp'
       });
 
       await image.save();

@@ -13,11 +13,13 @@ const commentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true, // Indeks qo'shildi
     },
     post: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
       required: true,
+      index: true, // Indeks qo'shildi
     },
     anonymous: {
       type: Boolean,
@@ -32,6 +34,9 @@ const commentSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Compound indeks - comment izlashni tezlashtirish uchun
+commentSchema.index({ post: 1, createdAt: -1 });
 
 const Comment = mongoose.model("Comment", commentSchema);
 
