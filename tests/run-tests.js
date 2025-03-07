@@ -117,7 +117,7 @@ export function setup() {
         postSlug = postResponse.slug;
         
       } catch (e) {
-        console.error(`Failed to parse create post response: ${e}`);
+        
       }
     } else {
       console.error(`Failed to create test post: ${createPostRes.status} ${createPostRes.body}`);

@@ -43,7 +43,7 @@ export default (req, res, next) => {
             });
         }
     } catch (e) {
-        console.error("Auth middleware error:", e);
+        
         return res.status(500).json({
             success: false,
             message: "Server xatosi, qayta urinib ko'ring"
