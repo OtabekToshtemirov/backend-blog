@@ -89,29 +89,19 @@ const corsOptions = {
       'https://otablog.ijaraol.uz',
       'http://localhost:3000',
       'http://127.0.0.1:3000',
-      'https://frontend-blog-six-theta.vercel.app',
-      // Coolify internal domains
-      'https://otablog-ijaraol-uz.coolify.app',
-      'https://backend-blog.coolify.app'
+      'https://frontend-blog-six-theta.vercel.app'
     ];
     
     // Agar origin yo'q bo'lsa (Postman yoki to'g'ridan-to'g'ri server so'rovlari uchun)
-    if (!origin) {
-      console.log('CORS: Origin mavjud emas, ruxsat berildi');
-      return callback(null, true);
-    }
+    if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log(`CORS: Origin ruxsat berildi - ${origin}`);
       callback(null, true);
     } else {
       // Development rejimida barcha domenlarni ruxsat berish
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`CORS: Development rejimi, origin ruxsat berildi - ${origin}`);
         callback(null, true);
       } else {
-        console.log(`CORS: Origin bloklandi - ${origin}`);
-        console.log(`CORS: Ruxsat berilgan domenlar:`, allowedOrigins);
         callback(new Error('CORS policy tomonidan bloklandi'), false);
       }
     }
@@ -138,10 +128,7 @@ app.use((req, res, next) => {
     'https://otablog.ijaraol.uz',
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'https://frontend-blog-six-theta.vercel.app',
-    // Coolify internal domains
-    'https://otablog-ijaraol-uz.coolify.app',
-    'https://backend-blog.coolify.app'
+    'https://frontend-blog-six-theta.vercel.app'
   ];
   
   if (allowedOrigins.includes(origin) || !origin || process.env.NODE_ENV !== 'production') {
