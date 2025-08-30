@@ -81,14 +81,18 @@ const upload = multer({
 
 // REST API middleware
 app.use(express.json());
-app.use(cors({
-  origin:origin: ['https://www.otablog.uz'],
+const corsOptions = {
+  origin: ['https://www.otablog.uz'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Authorization'],
   credentials: true,
   optionsSuccessStatus: 200
-}));
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 
 
 app.use("/uploads", express.static("uploads"));
