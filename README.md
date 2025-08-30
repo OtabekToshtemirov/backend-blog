@@ -1,7 +1,53 @@
-# Project Name
+# Backend Blog API
 
-## Description
-A brief description of your project, what it does, and its main features.
+Blog platformasi uchun REST API server.
+
+## Coolify Deployment Instructions
+
+### 1. Environment Variables
+Coolify dashboard da quyidagi environment variables ni sozlang:
+
+```
+MONGODB_USERNAME=your_mongodb_atlas_username
+MONGODB_PASSWORD=your_mongodb_atlas_password
+JWT_SECRET=your_strong_jwt_secret_key_minimum_32_characters
+NODE_ENV=production
+```
+
+**Eslatma:** PORT o'zgaruvchisini Coolify avtomatik belgilaydi.
+
+### 2. Build Commands
+Coolify uchun:
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+- **Port:** Avtomatik (odatda 3000)
+
+### 3. GitHub Repository
+Repository URL: `https://github.com/OtabekToshtemirov/backend-blog`
+Branch: `master`
+
+### 4. CORS Sozlamalari
+Server quyidagi domenlardan so'rovlarni qabul qiladi:
+- https://www.otablog.uz
+- https://otablog.uz
+- https://otablog.ijaraol.uz
+- Development uchun localhost
+
+### 5. Custom Domain
+Domain: `https://otablog.ijaraol.uz`
+
+### 6. Health Check
+Backend ishlayotganini tekshirish: `https://otablog.ijaraol.uz/health`
+
+## API Endpoints
+- GET /health - Server holati
+- POST /auth/register - Ro'yxatdan o'tish
+- POST /auth/login - Kirish
+- GET /posts - Barcha postlar
+- POST /posts - Yangi post yaratish
+- GET /posts/:slug - Post olish
+- POST /upload - Rasm yuklash
+- va boshqalar...
 
 ## Technologies Used
 - JavaScript

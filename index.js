@@ -81,9 +81,43 @@ const upload = multer({
 
 // Enable CORS for all routes - applying this before any routes
 const corsOptions = {
-  origin: ['https://www.otablog.uz', 'https://otablog.uz', 'https://otablog.ijaraol.uz'],
+  origin: function (origin, callback) {
+    // Barcha domenlarni ruxsat berish development uchun
+    const allowedOrigins = [
+      'https://www.otablog.uz', 
+      'https://otablog.uz', 
+      'https://otablog.ijaraol.uz',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://frontend-blog-six-theta.vercel.app',
+      // Coolify internal domains
+      'https://otablog-ijaraol-uz.coolify.app',
+      'https://backend-blog.coolify.app'
+    ];
+    
+    // Agar origin yo'q bo'lsa (Postman yoki to'g'ridan-to'g'ri server so'rovlari uchun)
+    if (!origin) {
+      console.log('CORS: Origin mavjud emas, ruxsat berildi');
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log(`CORS: Origin ruxsat berildi - ${origin}`);
+      callback(null, true);
+    } else {
+      // Development rejimida barcha domenlarni ruxsat berish
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`CORS: Development rejimi, origin ruxsat berildi - ${origin}`);
+        callback(null, true);
+      } else {
+        console.log(`CORS: Origin bloklandi - ${origin}`);
+        console.log(`CORS: Ruxsat berilgan domenlar:`, allowedOrigins);
+        callback(new Error('CORS policy tomonidan bloklandi'), false);
+      }
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept'],
   exposedHeaders: ['Authorization'],
   credentials: true,
   optionsSuccessStatus: 200
@@ -97,11 +131,33 @@ app.options('*', cors(corsOptions));
 
 // Ensure CORS headers are set correctly with a custom middleware
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'https://www.otablog.uz', 
+    'https://otablog.uz', 
+    'https://otablog.ijaraol.uz',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://frontend-blog-six-theta.vercel.app',
+    // Coolify internal domains
+    'https://otablog-ijaraol-uz.coolify.app',
+    'https://backend-blog.coolify.app'
+  ];
+  
+  if (allowedOrigins.includes(origin) || !origin || process.env.NODE_ENV !== 'production') {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Origin, X-Requested-With, Accept');
   res.header('Access-Control-Allow-Credentials', 'true');
-  next();
+  
+  // Preflight so'rovlar uchun
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
 });
 
 // REST API middleware
@@ -226,5 +282,22 @@ app.listen(PORT, (err) => {
     console.log("Serverda xato:", err);
   } else {
     console.log(`Server ${PORT} portda ishlamoqda`);
+    console.log(`Server URL: http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`CORS origins enabled: ${corsOptions.origin}`);
   }
+});
+
+// Umumi error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    message: 'Server xatosi', 
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' 
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ message: 'Endpoint topilmadi' });
 });
