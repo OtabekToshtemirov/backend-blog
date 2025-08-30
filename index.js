@@ -79,10 +79,9 @@ const upload = multer({
   }
 });
 
-// REST API middleware
-app.use(express.json());
+// Enable CORS for all routes - applying this before any routes
 const corsOptions = {
-  origin: ['https://www.otablog.uz'],
+  origin: ['https://www.otablog.uz', 'https://otablog.uz', 'https://otablog.ijaraol.uz'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   exposedHeaders: ['Authorization'],
@@ -90,11 +89,23 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+// Apply CORS middleware before any routes
 app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly for all routes
 app.options('*', cors(corsOptions));
 
+// Ensure CORS headers are set correctly with a custom middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
-
+// REST API middleware
+app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
 // Health check endpoint
