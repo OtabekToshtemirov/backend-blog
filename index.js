@@ -42,7 +42,7 @@ const connectionOptions = {
 
 const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
 // const mongoDB = `mongodb://localhost:27017/blog`;
-const PORT = process.env.PORT || 4444; // Default port qo'shildi
+const PORT = process.env.PORT || 5555; // Default port qo'shildi
 const HOST = process.env.HOST || '0.0.0.0'; // Coolify uchun kerak
 
 // Qayta urinishlar bilan MongoDB ga ulanish
