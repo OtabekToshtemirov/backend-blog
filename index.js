@@ -93,16 +93,24 @@ const corsOptions = {
       'https://frontend-blog-six-theta.vercel.app'
     ];
     
+    console.log(`CORS - Origin: ${origin}`);
+    
     // Agar origin yo'q bo'lsa (Postman yoki to'g'ridan-to'g'ri server so'rovlari uchun)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('CORS - No origin, allowing');
+      return callback(null, true);
+    }
     
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log('CORS - Origin allowed');
       callback(null, true);
     } else {
       // Development rejimida barcha domenlarni ruxsat berish
       if (process.env.NODE_ENV !== 'production') {
+        console.log('CORS - Development mode, allowing all origins');
         callback(null, true);
       } else {
+        console.log('CORS - Origin blocked:', origin);
         callback(new Error('CORS policy tomonidan bloklandi'), false);
       }
     }
@@ -120,28 +128,17 @@ app.use(cors(corsOptions));
 // Handle preflight requests explicitly for all routes
 app.options('*', cors(corsOptions));
 
-// Ensure CORS headers are set correctly with a custom middleware
+// Soddalashtirilgan CORS headers middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const allowedOrigins = [
-    'https://www.otablog.uz', 
-    'https://otablog.uz', 
-    'https://otablog.ijaraol.uz',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'https://frontend-blog-six-theta.vercel.app'
-  ];
   
-  if (allowedOrigins.includes(origin) || !origin || process.env.NODE_ENV !== 'production') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Origin, X-Requested-With, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  console.log(`Request origin: ${origin}`);
+  console.log(`Request method: ${req.method}`);
+  console.log(`Request path: ${req.path}`);
   
   // Preflight so'rovlar uchun
   if (req.method === 'OPTIONS') {
+    console.log('Handling preflight request');
     res.sendStatus(200);
   } else {
     next();
@@ -151,6 +148,22 @@ app.use((req, res, next) => {
 // REST API middleware
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`${timestamp} - ${req.method} ${req.url} - IP: ${req.ip || req.connection.remoteAddress}`);
+  console.log(`Headers:`, req.headers);
+  
+  // Response logging
+  const originalSend = res.send;
+  res.send = function(data) {
+    console.log(`${timestamp} - Response: ${res.statusCode} for ${req.method} ${req.url}`);
+    originalSend.call(this, data);
+  };
+  
+  next();
+});
 
 // Health check endpoint
 /**
@@ -202,7 +215,81 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("Server ishlamoqda");
+  res.json({
+    message: "OtaBlog API Server ishlamoqda",
+    version: "1.0.0",
+    status: "ok",
+    endpoints: {
+      health: "/health",
+      posts: "/posts",
+      auth: "/auth/*",
+      uploads: "/upload"
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Favicon endpoint
+app.get("/favicon.ico", (req, res) => {
+  res.status(204).end(); // No content
+});
+
+// Debug endpointlari
+/**
+ * @swagger
+ * /debug/info:
+ *   get:
+ *     summary: Server ma'lumotlarini olish
+ *     description: Debugging uchun server holatini ko'rsatadi
+ *     tags: [Debug]
+ *     responses:
+ *       200:
+ *         description: Server ma'lumotlari
+ */
+app.get("/debug/info", (req, res) => {
+  res.json({
+    server: {
+      host: HOST,
+      port: PORT,
+      environment: process.env.NODE_ENV,
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      version: process.version
+    },
+    database: {
+      status: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+      host: mongoose.connection.host,
+      name: mongoose.connection.name
+    },
+    request: {
+      ip: req.ip,
+      headers: req.headers,
+      method: req.method,
+      url: req.url
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
+ * @swagger
+ * /debug/headers:
+ *   get:
+ *     summary: Request headerlarini ko'rsatish
+ *     description: CORS va proxy muammolarini hal qilish uchun
+ *     tags: [Debug]
+ */
+app.get("/debug/headers", (req, res) => {
+  res.json({
+    headers: req.headers,
+    method: req.method,
+    url: req.url,
+    ip: req.ip,
+    protocol: req.protocol,
+    secure: req.secure,
+    xhr: req.xhr,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Yangilangan upload endpointi
@@ -309,10 +396,22 @@ const server = app.listen(PORT, HOST, (err) => {
     console.log("Serverda xato:", err);
     process.exit(1);
   } else {
-    console.log(`Server ${HOST}:${PORT} da ishlamoqda`);
-    console.log(`Server URL: http://${HOST}:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`MongoDB ulanish holati: ${mongoose.connection.readyState === 1 ? 'ulangan' : 'ulanmagan'}`);
+    console.log(`\n🚀 Server ishga tushdi!`);
+    console.log(`📍 Manzil: ${HOST}:${PORT}`);
+    console.log(`🌐 URL: http://${HOST}:${PORT}`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`💾 MongoDB: ${mongoose.connection.readyState === 1 ? '✅ Ulangan' : '❌ Ulanmagan'}`);
+    console.log(`📊 Memory: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`);
+    console.log(`⏰ Vaqt: ${new Date().toISOString()}`);
+    
+    // Environment variables tekshirish
+    console.log(`\n📋 Environment Variables:`);
+    console.log(`   NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`   PORT: ${process.env.PORT}`);
+    console.log(`   HOST: ${process.env.HOST}`);
+    console.log(`   MongoDB username: ${process.env.MONGODB_USERNAME ? '✅ Mavjud' : '❌ Yo\'q'}`);
+    console.log(`   MongoDB password: ${process.env.MONGODB_PASSWORD ? '✅ Mavjud' : '❌ Yo\'q'}`);
+    console.log(`   JWT_SECRET: ${process.env.JWT_SECRET ? '✅ Mavjud' : '❌ Yo\'q'}`);
   }
 });
 
