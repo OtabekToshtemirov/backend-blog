@@ -29,6 +29,7 @@ const connectionOptions = {
 const mongoDB = `mongodb+srv://${username}:${password}@otablog.cnweg.mongodb.net/?retryWrites=true&w=majority&appName=Otablog`;
 // const mongoDB = `mongodb://localhost:27017/blog`;
 const PORT = process.env.PORT || 4444; // Default port qo'shildi
+const HOST = process.env.HOST || '0.0.0.0'; // Coolify uchun kerak
 
 // Qayta urinishlar bilan MongoDB ga ulanish
 const connectWithRetry = () => {
@@ -152,13 +153,52 @@ app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
 // Health check endpoint
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Server va database holatini tekshirish
+ *     description: Load balancer va monitoring uchun server salomatlik holatini qaytaradi
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Server ishlayapti
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ *                 dbConnection:
+ *                   type: string
+ *                   example: connected
+ *                 serverTime:
+ *                   type: string
+ *                   example: 2025-09-03T12:00:00.000Z
+ *                 uptime:
+ *                   type: number
+ *                   example: 3600.123
+ *       503:
+ *         description: Database bilan bog'lanish muammosi
+ */
 app.get("/health", (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
-  res.status(200).json({ 
-    status: "ok", 
+  const healthCheck = {
+    status: dbStatus === "connected" ? "ok" : "error",
     dbConnection: dbStatus,
-    serverTime: new Date().toISOString()
-  });
+    serverTime: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  if (dbStatus === "connected") {
+    res.status(200).json(healthCheck);
+  } else {
+    res.status(503).json(healthCheck);
+  }
 });
 
 app.get("/", (req, res) => {
@@ -264,27 +304,76 @@ app.get("/comments", getAllComments);
 app.patch("/comments/:commentId", checkAuth, commentValidation, handleValidationErrors, editComment); // Edit a comment
 app.delete("/comments/:commentId", checkAuth, deleteComment); // Delete a comment
 
-app.listen(PORT, (err) => {
+const server = app.listen(PORT, HOST, (err) => {
   if (err) {
     console.log("Serverda xato:", err);
+    process.exit(1);
   } else {
-    console.log(`Server ${PORT} portda ishlamoqda`);
-    console.log(`Server URL: http://localhost:${PORT}`);
+    console.log(`Server ${HOST}:${PORT} da ishlamoqda`);
+    console.log(`Server URL: http://${HOST}:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`CORS origins enabled: ${corsOptions.origin}`);
+    console.log(`MongoDB ulanish holati: ${mongoose.connection.readyState === 1 ? 'ulangan' : 'ulanmagan'}`);
   }
+});
+
+// Graceful shutdown
+const gracefulShutdown = (signal) => {
+  console.log(`\n${signal} signal qabul qilindi. Serverni to'xtatish...`);
+  
+  server.close(() => {
+    console.log('HTTP server yopildi.');
+    
+    mongoose.connection.close(false, () => {
+      console.log('MongoDB ulanishi yopildi.');
+      process.exit(0);
+    });
+  });
+  
+  // Agar 10 soniyada yopilmasa, majburiy to'xtatish
+  setTimeout(() => {
+    console.error('Majburiy to\'xtatish, 10 soniya o\'tdi.');
+    process.exit(1);
+  }, 10000);
+};
+
+// Signal handlerlar
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Unhandled promise rejection
+process.on('unhandledRejection', (err, promise) => {
+  console.error('Unhandled Promise Rejection:', err);
+  console.error('Promise:', promise);
+  gracefulShutdown('UNHANDLED_REJECTION');
+});
+
+// Uncaught exception
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
 // Umumi error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
+  console.error('Request URL:', req.url);
+  console.error('Request method:', req.method);
+  console.error('Request headers:', req.headers);
+  
   res.status(500).json({ 
     message: 'Server xatosi', 
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' 
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+    timestamp: new Date().toISOString()
   });
 });
 
 // 404 handler
 app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Endpoint topilmadi' });
+  console.log(`404 - Topilmagan endpoint: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ 
+    message: 'Endpoint topilmadi',
+    path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
 });
