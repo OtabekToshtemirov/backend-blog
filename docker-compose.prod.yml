@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # Faqat backend API (MongoDB cloud da)
+  otablog-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: otablog-api-prod
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    environment:
+      - NODE_ENV=production
+      - PORT=5555
+      - HOST=0.0.0.0
+      - MONGODB_USERNAME=${MONGODB_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5555/healthz', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - otablog-network
+
+networks:
+  otablog-network:
+    driver: bridge
