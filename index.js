@@ -169,12 +169,8 @@ app.use((req, res, next) => {
   console.log(`📡 User-Agent: ${req.headers['user-agent']?.substring(0, 50)}...`);
   
   // Trust proxy headers (Coolify setup)
-  // Express automatically handles req.ip when trust proxy is enabled
-  // No need to manually set req.ip
-  
-  if (req.headers['x-forwarded-proto']) {
-    req.protocol = req.headers['x-forwarded-proto'];
-  }
+  // Express automatically handles req.ip and req.protocol when trust proxy is enabled
+  // No need to manually set these read-only properties
   
   // Set response headers for proxy compatibility
   res.header('X-Powered-By', 'OtaBlog-API');
