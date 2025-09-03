@@ -169,9 +169,8 @@ app.use((req, res, next) => {
   console.log(`📡 User-Agent: ${req.headers['user-agent']?.substring(0, 50)}...`);
   
   // Trust proxy headers (Coolify setup)
-  if (req.headers['x-forwarded-for']) {
-    req.ip = req.headers['x-forwarded-for'].split(',')[0].trim();
-  }
+  // Express automatically handles req.ip when trust proxy is enabled
+  // No need to manually set req.ip
   
   if (req.headers['x-forwarded-proto']) {
     req.protocol = req.headers['x-forwarded-proto'];
@@ -198,9 +197,12 @@ app.use("/uploads", express.static("uploads"));
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
   console.log(`\n⏰ ${timestamp} - ${req.method} ${req.url}`);
-  console.log(`📍 IP: ${req.ip || req.connection.remoteAddress}`);
-  console.log(`🌍 Real IP: ${req.headers['x-real-ip'] || 'N/A'}`);
-  console.log(`🔗 Forwarded: ${req.headers['x-forwarded-for'] || 'Direct'}`);
+  
+  // Express automatically sets req.ip when trust proxy is enabled
+  const realIp = req.ip || req.headers['x-real-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.connection.remoteAddress;
+  console.log(`📍 Client IP: ${realIp}`);
+  console.log(`🌍 X-Forwarded-For: ${req.headers['x-forwarded-for'] || 'Direct'}`);
+  console.log(`🔒 Protocol: ${req.protocol}`);
   
   // Response timing
   const startTime = Date.now();
