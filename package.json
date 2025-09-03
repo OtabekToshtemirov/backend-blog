@@ -2,6 +2,7 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.19.2",
@@ -27,7 +28,13 @@
     "test": "echo 'No tests specified'",
     "install:prod": "npm install --omit=dev"
   },
-  "keywords": ["blog", "api", "nodejs", "express", "mongodb"],
+  "keywords": [
+    "blog",
+    "api",
+    "nodejs",
+    "express",
+    "mongodb"
+  ],
   "author": "Otabek Toshtemirov",
   "license": "ISC",
   "description": "Backend API for OtaBlog - A modern blogging platform"

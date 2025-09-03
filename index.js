@@ -86,6 +86,13 @@ mongoose.connection.on('reconnected', () => {
 
 const app = express();
 
+// Trust proxy (Coolify/Docker network uchun)
+app.set('trust proxy', true);
+
+// Request size limits
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
 // Xotira optimizatsiyasi uchun memoryStorage ishlatilmoqda
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -150,17 +157,33 @@ app.use(cors(corsOptions));
 // Handle preflight requests explicitly for all routes
 app.options('*', cors(corsOptions));
 
-// Soddalashtirilgan CORS headers middleware
+// Proxy headers middleware (Coolify uchun)
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
+  // Proxy headers information logging
+  console.log(`\n🌐 Request: ${req.method} ${req.url}`);
+  console.log(`📍 Origin: ${req.headers.origin || 'No origin'}`);
+  console.log(`🔗 Referer: ${req.headers.referer || 'No referer'}`);
+  console.log(`🏠 Host: ${req.headers.host}`);
+  console.log(`🌍 X-Forwarded-For: ${req.headers['x-forwarded-for'] || 'Direct'}`);
+  console.log(`🔒 X-Forwarded-Proto: ${req.headers['x-forwarded-proto'] || 'http'}`);
+  console.log(`📡 User-Agent: ${req.headers['user-agent']?.substring(0, 50)}...`);
   
-  console.log(`Request origin: ${origin}`);
-  console.log(`Request method: ${req.method}`);
-  console.log(`Request path: ${req.path}`);
+  // Trust proxy headers (Coolify setup)
+  if (req.headers['x-forwarded-for']) {
+    req.ip = req.headers['x-forwarded-for'].split(',')[0].trim();
+  }
+  
+  if (req.headers['x-forwarded-proto']) {
+    req.protocol = req.headers['x-forwarded-proto'];
+  }
+  
+  // Set response headers for proxy compatibility
+  res.header('X-Powered-By', 'OtaBlog-API');
+  res.header('X-Response-Time', Date.now());
   
   // Preflight so'rovlar uchun
   if (req.method === 'OPTIONS') {
-    console.log('Handling preflight request');
+    console.log('✅ Handling preflight request');
     res.sendStatus(200);
   } else {
     next();
@@ -174,13 +197,19 @@ app.use("/uploads", express.static("uploads"));
 // Request logging middleware
 app.use((req, res, next) => {
   const timestamp = new Date().toISOString();
-  console.log(`${timestamp} - ${req.method} ${req.url} - IP: ${req.ip || req.connection.remoteAddress}`);
-  console.log(`Headers:`, req.headers);
+  console.log(`\n⏰ ${timestamp} - ${req.method} ${req.url}`);
+  console.log(`📍 IP: ${req.ip || req.connection.remoteAddress}`);
+  console.log(`🌍 Real IP: ${req.headers['x-real-ip'] || 'N/A'}`);
+  console.log(`🔗 Forwarded: ${req.headers['x-forwarded-for'] || 'Direct'}`);
+  
+  // Response timing
+  const startTime = Date.now();
   
   // Response logging
   const originalSend = res.send;
   res.send = function(data) {
-    console.log(`${timestamp} - Response: ${res.statusCode} for ${req.method} ${req.url}`);
+    const duration = Date.now() - startTime;
+    console.log(`✅ ${timestamp} - ${res.statusCode} for ${req.method} ${req.url} (${duration}ms)`);
     originalSend.call(this, data);
   };
   
@@ -198,23 +227,6 @@ app.use((req, res, next) => {
  *     responses:
  *       200:
  *         description: Server ishlayapti
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: ok
- *                 dbConnection:
- *                   type: string
- *                   example: connected
- *                 serverTime:
- *                   type: string
- *                   example: 2025-09-03T12:00:00.000Z
- *                 uptime:
- *                   type: number
- *                   example: 3600.123
  *       503:
  *         description: Database bilan bog'lanish muammosi
  */
@@ -226,7 +238,29 @@ app.get("/health", (req, res) => {
     serverTime: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT,
+    host: HOST
+  };
+  
+  // Always return 200 for basic health check to pass load balancer
+  res.status(200).json(healthCheck);
+});
+
+// Detailed health check for internal use
+app.get("/health/detailed", (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+  const healthCheck = {
+    status: dbStatus === "connected" ? "ok" : "error",
+    dbConnection: dbStatus,
+    serverTime: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT,
+    host: HOST,
+    version: "1.0.0",
+    endpoints: ["/", "/health", "/posts", "/auth/login", "/auth/register"]
   };
   
   if (dbStatus === "connected") {
@@ -234,6 +268,21 @@ app.get("/health", (req, res) => {
   } else {
     res.status(503).json(healthCheck);
   }
+});
+
+// Readiness probe
+app.get("/ready", (req, res) => {
+  const dbReady = mongoose.connection.readyState === 1;
+  if (dbReady) {
+    res.status(200).json({ status: "ready" });
+  } else {
+    res.status(503).json({ status: "not ready", reason: "database not connected" });
+  }
+});
+
+// Liveness probe
+app.get("/live", (req, res) => {
+  res.status(200).json({ status: "alive", timestamp: new Date().toISOString() });
 });
 
 app.get("/", (req, res) => {
@@ -311,6 +360,55 @@ app.get("/debug/headers", (req, res) => {
     secure: req.secure,
     xhr: req.xhr,
     timestamp: new Date().toISOString()
+  });
+});
+
+// Coolify troubleshooting endpoints
+app.get("/debug/proxy", (req, res) => {
+  res.json({
+    message: "Proxy diagnostic info",
+    serverInfo: {
+      host: HOST,
+      port: PORT,
+      environment: process.env.NODE_ENV,
+      uptime: process.uptime()
+    },
+    request: {
+      method: req.method,
+      url: req.url,
+      originalUrl: req.originalUrl,
+      protocol: req.protocol,
+      secure: req.secure,
+      ip: req.ip,
+      ips: req.ips,
+      host: req.get('host'),
+      origin: req.get('origin'),
+      referer: req.get('referer')
+    },
+    headers: {
+      'x-forwarded-for': req.headers['x-forwarded-for'],
+      'x-forwarded-proto': req.headers['x-forwarded-proto'],
+      'x-forwarded-host': req.headers['x-forwarded-host'],
+      'x-real-ip': req.headers['x-real-ip'],
+      'host': req.headers['host'],
+      'user-agent': req.headers['user-agent']
+    },
+    coolify: {
+      internal_url: `http://vsc88csg8okgkscg8080ko4k.158.220.108.219.sslip.io`,
+      public_url: `https://otablog.ijaraol.uz`,
+      expected_port: PORT,
+      expected_host: HOST
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Simple ping endpoint
+app.get("/ping", (req, res) => {
+  res.json({ 
+    message: "pong", 
+    timestamp: new Date().toISOString(),
+    server: `${HOST}:${PORT}`
   });
 });
 
@@ -415,7 +513,7 @@ app.delete("/comments/:commentId", checkAuth, deleteComment); // Delete a commen
 
 const server = app.listen(PORT, HOST, (err) => {
   if (err) {
-    console.log("Serverda xato:", err);
+    console.log("❌ Serverda xato:", err);
     process.exit(1);
   } else {
     console.log(`\n🚀 Server ishga tushdi!`);
@@ -438,6 +536,9 @@ const server = app.listen(PORT, HOST, (err) => {
     console.log(`\n📡 Endpointlar:`);
     console.log(`   🏠 Root: /`);
     console.log(`   💚 Health: /health`);
+    console.log(`   🔍 Detailed Health: /health/detailed`);
+    console.log(`   ✅ Ready: /ready`);
+    console.log(`   💓 Live: /live`);
     console.log(`   🐛 Debug Info: /debug/info`);
     console.log(`   📊 Debug Headers: /debug/headers`);
     console.log(`   📝 Posts: /posts`);
@@ -447,43 +548,52 @@ const server = app.listen(PORT, HOST, (err) => {
     if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
       console.warn(`\n⚠️  MUHIM: Coolifyda JWT_SECRET environment variable o'rnating!`);
     }
+    
+    // Container readiness signal
+    console.log(`\n🟢 Server tayyor - so'rovlarni qabul qilish mumkin!`);
   }
 });
 
-// Graceful shutdown
+// Improved graceful shutdown
 const gracefulShutdown = (signal) => {
-  console.log(`\n${signal} signal qabul qilindi. Serverni to'xtatish...`);
+  console.log(`\n🛑 ${signal} signal qabul qilindi. Serverni to'xtatish...`);
   
+  // HTTP serverni yangi connectionlarni qabul qilishni to'xtatish
   server.close(() => {
-    console.log('HTTP server yopildi.');
+    console.log('🔌 HTTP server yopildi (yangi so\'rovlar qabul qilinmaydi).');
     
+    // MongoDB ulanishini yopish
     mongoose.connection.close(false, () => {
-      console.log('MongoDB ulanishi yopildi.');
+      console.log('💾 MongoDB ulanishi yopildi.');
+      console.log('✅ Graceful shutdown tugallandi.');
       process.exit(0);
     });
   });
   
-  // Agar 10 soniyada yopilmasa, majburiy to'xtatish
+  // Aktiv connectionlar tugashini kutish
   setTimeout(() => {
-    console.error('Majburiy to\'xtatish, 10 soniya o\'tdi.');
+    console.error('⏰ 15 soniya o\'tdi, majburiy to\'xtatish...');
     process.exit(1);
-  }, 10000);
+  }, 15000); // Coolify uchun ko'proq vaqt
 };
 
-// Signal handlerlar
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// Container lifecycle signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM')); // Docker stop
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));   // Ctrl+C
+process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));   // Terminal closed
 
-// Unhandled promise rejection
+// Error handling
 process.on('unhandledRejection', (err, promise) => {
-  console.error('Unhandled Promise Rejection:', err);
+  console.error('❌ Unhandled Promise Rejection:', err);
   console.error('Promise:', promise);
-  gracefulShutdown('UNHANDLED_REJECTION');
+  // Production da restart, development da continue
+  if (process.env.NODE_ENV === 'production') {
+    gracefulShutdown('UNHANDLED_REJECTION');
+  }
 });
 
-// Uncaught exception
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+  console.error('❌ Uncaught Exception:', err);
   gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
