@@ -15,7 +15,21 @@ import sharp from 'sharp';
 
 const username = encodeURIComponent(process.env.MONGODB_USERNAME);
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
-const JWT_SECRET = process.env.JWT_SECRET || 'secretKey123'; // .env faylida JWT_SECRET o'zgaruvchisini qo'shish kerak
+
+// JWT_SECRET tekshirish va xavfsizlik
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.warn('⚠️  JWT_SECRET environment variable o\'rnatilmagan!');
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Production muhitida JWT_SECRET majburiy!');
+    // Production muhitida random JWT_SECRET yaratish
+    JWT_SECRET = require('crypto').randomBytes(64).toString('hex');
+    console.log('🔑 Vaqtinchalik JWT_SECRET yaratildi. Coolifyda JWT_SECRET o\'rnating!');
+  } else {
+    JWT_SECRET = 'secretKey123';
+    console.log('🔧 Development uchun default JWT_SECRET ishlatilmoqda');
+  }
+}
 
 // MongoDB ulanish sozlamalari
 const connectionOptions = {
@@ -53,13 +67,21 @@ const connectWithRetry = () => {
 connectWithRetry();
 
 // MongoDB ulanish holatini kuzatish
+mongoose.connection.on('connected', () => {
+  console.log('✅ MongoDB muvaffaqiyatli ulandi');
+});
+
 mongoose.connection.on('error', err => {
-  console.error('MongoDB xatosi:', err);
+  console.error('❌ MongoDB xatosi:', err);
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB dan uzildi, qayta ulanish...');
+  console.log('🔌 MongoDB dan uzildi, qayta ulanish...');
   setTimeout(connectWithRetry, 5000);
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('🔄 MongoDB qayta ulandi');
 });
 
 const app = express();
@@ -411,7 +433,20 @@ const server = app.listen(PORT, HOST, (err) => {
     console.log(`   HOST: ${process.env.HOST}`);
     console.log(`   MongoDB username: ${process.env.MONGODB_USERNAME ? '✅ Mavjud' : '❌ Yo\'q'}`);
     console.log(`   MongoDB password: ${process.env.MONGODB_PASSWORD ? '✅ Mavjud' : '❌ Yo\'q'}`);
-    console.log(`   JWT_SECRET: ${process.env.JWT_SECRET ? '✅ Mavjud' : '❌ Yo\'q'}`);
+    console.log(`   JWT_SECRET: ${process.env.JWT_SECRET ? '✅ Mavjud' : '🔧 Auto-generated'}`);
+    
+    console.log(`\n📡 Endpointlar:`);
+    console.log(`   🏠 Root: /`);
+    console.log(`   💚 Health: /health`);
+    console.log(`   🐛 Debug Info: /debug/info`);
+    console.log(`   📊 Debug Headers: /debug/headers`);
+    console.log(`   📝 Posts: /posts`);
+    console.log(`   👤 Auth: /auth/*`);
+    console.log(`   📷 Upload: /upload`);
+    
+    if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+      console.warn(`\n⚠️  MUHIM: Coolifyda JWT_SECRET environment variable o'rnating!`);
+    }
   }
 });
 

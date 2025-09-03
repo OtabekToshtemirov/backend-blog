@@ -10,9 +10,11 @@
     "mongodb": "^6.8.0",
     "mongoose": "^8.5.0",
     "multer": "^1.4.5-lts.1",
-    "nodemon": "^3.1.4",
     "sharp": "^0.33.5",
     "slugify": "^1.6.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
   },
   "type": "module",
   "name": "myblog",
@@ -22,10 +24,11 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "build": "echo 'No build step required for Node.js'",
-    "test": "echo 'No tests specified'"
+    "test": "echo 'No tests specified'",
+    "install:prod": "npm install --omit=dev"
   },
-  "keywords": [],
+  "keywords": ["blog", "api", "nodejs", "express", "mongodb"],
   "author": "Otabek Toshtemirov",
   "license": "ISC",
-  "description": ""
+  "description": "Backend API for OtaBlog - A modern blogging platform"
 }
