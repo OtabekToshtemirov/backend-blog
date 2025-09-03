@@ -231,58 +231,130 @@ app.use((req, res, next) => {
  *         description: Database bilan bog'lanish muammosi
  */
 app.get("/health", (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
-  const healthCheck = {
-    status: dbStatus === "connected" ? "ok" : "error",
-    dbConnection: dbStatus,
-    serverTime: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    environment: process.env.NODE_ENV || 'development',
-    port: PORT,
-    host: HOST
-  };
-  
-  // Always return 200 for basic health check to pass load balancer
-  res.status(200).json(healthCheck);
+  try {
+    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+    
+    // Sodda health check object
+    const healthCheck = {
+      status: "ok",
+      dbConnection: dbStatus,
+      serverTime: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      port: PORT,
+      host: HOST
+    };
+    
+    console.log('Health check so\'rovi keldi:', healthCheck);
+    
+    // Always return 200 for basic health check to pass load balancer
+    res.status(200).json(healthCheck);
+  } catch (error) {
+    console.error('Health check xatosi:', error);
+    res.status(200).json({
+      status: "error",
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Detailed health check for internal use
 app.get("/health/detailed", (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
-  const healthCheck = {
-    status: dbStatus === "connected" ? "ok" : "error",
-    dbConnection: dbStatus,
-    serverTime: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    environment: process.env.NODE_ENV || 'development',
-    port: PORT,
-    host: HOST,
-    version: "1.0.0",
-    endpoints: ["/", "/health", "/posts", "/auth/login", "/auth/register"]
-  };
-  
-  if (dbStatus === "connected") {
-    res.status(200).json(healthCheck);
-  } else {
-    res.status(503).json(healthCheck);
+  try {
+    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+    
+    const healthCheck = {
+      status: dbStatus === "connected" ? "ok" : "warning",
+      dbConnection: dbStatus,
+      serverTime: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      environment: process.env.NODE_ENV || 'development',
+      port: PORT,
+      host: HOST,
+      version: "1.0.0",
+      endpoints: ["/", "/health", "/posts", "/auth/login", "/auth/register"],
+      mongodb: {
+        readyState: mongoose.connection.readyState,
+        host: mongoose.connection.host || 'cloud',
+        name: mongoose.connection.name || 'otablog'
+      }
+    };
+    
+    // Memory ma'lumotini xavfsiz tarzda qo'shish
+    try {
+      const memory = process.memoryUsage();
+      healthCheck.memory = {
+        heapUsed: Math.round(memory.heapUsed / 1024 / 1024) + 'MB',
+        heapTotal: Math.round(memory.heapTotal / 1024 / 1024) + 'MB',
+        external: Math.round(memory.external / 1024 / 1024) + 'MB'
+      };
+    } catch (memError) {
+      healthCheck.memory = "unavailable";
+    }
+    
+    console.log('Detailed health check so\'rovi keldi');
+    
+    if (dbStatus === "connected") {
+      res.status(200).json(healthCheck);
+    } else {
+      res.status(503).json(healthCheck);
+    }
+  } catch (error) {
+    console.error('Detailed health check xatosi:', error);
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
 // Readiness probe
 app.get("/ready", (req, res) => {
-  const dbReady = mongoose.connection.readyState === 1;
-  if (dbReady) {
-    res.status(200).json({ status: "ready" });
-  } else {
-    res.status(503).json({ status: "not ready", reason: "database not connected" });
+  try {
+    const dbReady = mongoose.connection.readyState === 1;
+    console.log('Readiness probe so\'rovi keldi, DB holati:', dbReady);
+    
+    if (dbReady) {
+      res.status(200).json({ 
+        status: "ready", 
+        timestamp: new Date().toISOString(),
+        db: "connected"
+      });
+    } else {
+      res.status(503).json({ 
+        status: "not ready", 
+        reason: "database not connected",
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Readiness probe xatosi:', error);
+    res.status(503).json({
+      status: "error",
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
 // Liveness probe
 app.get("/live", (req, res) => {
-  res.status(200).json({ status: "alive", timestamp: new Date().toISOString() });
+  try {
+    console.log('Liveness probe so\'rovi keldi');
+    res.status(200).json({ 
+      status: "alive", 
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime())
+    });
+  } catch (error) {
+    console.error('Liveness probe xatosi:', error);
+    res.status(200).json({
+      status: "alive",
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 app.get("/", (req, res) => {
@@ -405,10 +477,26 @@ app.get("/debug/proxy", (req, res) => {
 
 // Simple ping endpoint
 app.get("/ping", (req, res) => {
+  console.log('Ping so\'rovi keldi');
   res.json({ 
     message: "pong", 
     timestamp: new Date().toISOString(),
     server: `${HOST}:${PORT}`
+  });
+});
+
+// Ultra simple health endpoint for testing
+app.get("/healthz", (req, res) => {
+  console.log('Healthz so\'rovi keldi');
+  res.status(200).send('OK');
+});
+
+// Simple status endpoint
+app.get("/status", (req, res) => {
+  console.log('Status so\'rovi keldi');
+  res.json({
+    status: "running",
+    time: new Date().toISOString()
   });
 });
 
